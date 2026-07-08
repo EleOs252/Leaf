@@ -13,6 +13,6 @@ public class VanillaHopper extends ConfigModules {
 
     @Override
     public void onLoaded() {
-        enabled = config.getBoolean(getBasePath(), enabled);
+        enabled = config.getBoolean(getBasePath(), enabled) || McTechnicalSurvivalMode.enabled;
     }
 }
