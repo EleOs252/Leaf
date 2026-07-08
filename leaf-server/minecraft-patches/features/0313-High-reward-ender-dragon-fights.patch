@@ -1,0 +1,98 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: EleOs252 <zel@lunar.cc>
+Date: Wed, 8 Jul 2026 22:05:08 +0800
+Subject: [PATCH] High reward ender dragon fights
+
+
+diff --git a/net/minecraft/world/entity/boss/enderdragon/EnderDragon.java b/net/minecraft/world/entity/boss/enderdragon/EnderDragon.java
+index 773351cd6c40e57a9c81d3d1b25161f282ad09c2..2e56d123d5b800cc11bb9cc3ebee2c2c999c9f62 100644
+--- a/net/minecraft/world/entity/boss/enderdragon/EnderDragon.java
++++ b/net/minecraft/world/entity/boss/enderdragon/EnderDragon.java
+@@ -1095,7 +1095,7 @@ public class EnderDragon extends Mob implements Enemy {
+ 
+     // Paper start - init expToDrop for already dying spawned dragon (like in MC-306798)
+     private int getDefaultExpToDrop() {
+-        if (this.dragonFight != null && !this.dragonFight.hasPreviouslyKilledDragon()) {
++        if (this.dragonFight != null && (org.dreeam.leaf.config.modules.gameplay.AlwaysHighRewardEnderDragonFight.enabled || !this.dragonFight.hasPreviouslyKilledDragon())) { // Leaf - always high reward ender dragon fight
+             return 12000;
+         }
+         return 500;
+diff --git a/net/minecraft/world/level/dimension/end/EnderDragonFight.java b/net/minecraft/world/level/dimension/end/EnderDragonFight.java
+index 2cf0e6a34d07fe3559b5c3b5e0944ce53135d45e..322990a0ac54aa9f63ac52c71acfe29f54a9b700 100644
+--- a/net/minecraft/world/level/dimension/end/EnderDragonFight.java
++++ b/net/minecraft/world/level/dimension/end/EnderDragonFight.java
+@@ -95,6 +95,7 @@ public class EnderDragonFight extends SavedData {
+     private int ticksSinceCrystalsScanned;
+     private int ticksSinceLastPlayerScan = 21;
+     private boolean dragonKilled;
++    private long dragonFightCount;
+     public boolean hasPreviouslyKilledDragon;
+     private boolean skipArenaLoadedCheck = false;
+     private @Nullable UUID dragonUUID;
+@@ -107,6 +108,7 @@ public class EnderDragonFight extends SavedData {
+         i -> i.group(
+                 ExtraCodecs.optionalAlwaysPresentFieldOf(Codec.BOOL, "needs_state_scanning", true).forGetter(fight -> fight.needsStateScanning),
+                 ExtraCodecs.optionalAlwaysPresentFieldOf(Codec.BOOL, "dragon_killed", false).forGetter(fight -> fight.dragonKilled),
++                ExtraCodecs.optionalAlwaysPresentFieldOf(Codec.LONG, "dragon_fight_count", 0L).forGetter(fight -> fight.dragonFightCount),
+                 ExtraCodecs.optionalAlwaysPresentFieldOf(Codec.BOOL, "previously_killed", false).forGetter(fight -> fight.hasPreviouslyKilledDragon),
+                 DragonRespawnStage.CODEC.optionalFieldOf("respawn_stage").forGetter(fight -> Optional.ofNullable(fight.respawnStage)),
+                 ExtraCodecs.optionalAlwaysPresentFieldOf(Codec.INT, "respawn_time", 0).forGetter(fight -> fight.respawnTime),
+@@ -122,12 +124,13 @@ public class EnderDragonFight extends SavedData {
+     );
+ 
+     public static EnderDragonFight createDefault() {
+-        return new EnderDragonFight(true, false, false, Optional.empty(), 0, Optional.empty(), Optional.empty(), new ObjectArrayList<>(), List.of());
++        return new EnderDragonFight(true, false, 0L, false, Optional.empty(), 0, Optional.empty(), Optional.empty(), new ObjectArrayList<>(), List.of());
+     }
+ 
+     public EnderDragonFight(
+         final boolean needsStateScanning,
+         final boolean dragonKilled,
++        final long dragonFightCount,
+         final boolean previouslyKilled,
+         final Optional<DragonRespawnStage> respawnStage,
+         final int respawnTime,
+@@ -139,6 +142,7 @@ public class EnderDragonFight extends SavedData {
+         this.needsStateScanning = needsStateScanning;
+         this.dragonUUID = dragonUUID.orElse(null);
+         this.dragonKilled = dragonKilled;
++        this.dragonFightCount = dragonFightCount;
+         this.hasPreviouslyKilledDragon = previouslyKilled;
+         this.respawnStage = respawnStage.orElse(null);
+         this.respawnTime = respawnTime;
+@@ -405,10 +409,15 @@ public class EnderDragonFight extends SavedData {
+ 
+     public void setDragonKilled(final EnderDragon dragon) {
+         if (dragon.getUUID().equals(this.dragonUUID)) {
++            if (this.dragonKilled) {
++                return;
++            }
++
+             this.dragonEvent.setProgress(0.0F);
+             this.dragonEvent.setVisible(false);
+             this.spawnExitPortal(true);
+             this.spawnNewGateway();
++            this.dragonFightCount++;
+             // Paper start - Add DragonEggFormEvent
+             BlockPos eggPosition = this.level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, EndPodiumFeature.getLocation(this.origin));
+             org.bukkit.craftbukkit.block.CraftBlockState eggState = org.bukkit.craftbukkit.block.CraftBlockStates.getBlockState(this.level, eggPosition);
+@@ -416,7 +425,7 @@ public class EnderDragonFight extends SavedData {
+             io.papermc.paper.event.block.DragonEggFormEvent eggEvent = new io.papermc.paper.event.block.DragonEggFormEvent(
+                 org.bukkit.craftbukkit.block.CraftBlock.at(this.level, eggPosition), eggState, new org.bukkit.craftbukkit.boss.CraftDragonBattle(this)
+             );
+-            if (!this.level.paperConfig().entities.behavior.enderDragonsDeathAlwaysPlacesDragonEgg && this.hasPreviouslyKilledDragon) { // Paper - Add toggle for always placing the dragon egg
++            if (!org.dreeam.leaf.config.modules.gameplay.AlwaysHighRewardEnderDragonFight.enabled && !this.level.paperConfig().entities.behavior.enderDragonsDeathAlwaysPlacesDragonEgg && this.hasPreviouslyKilledDragon) { // Paper - Add toggle for always placing the dragon egg // Leaf - always high reward ender dragon fight
+                 eggEvent.setCancelled(true);
+             }
+             if (eggEvent.callEvent()) {
+@@ -552,6 +561,10 @@ public class EnderDragonFight extends SavedData {
+         return this.hasPreviouslyKilledDragon;
+     }
+ 
++    public long getDragonFightCount() {
++        return this.dragonFightCount;
++    }
++
+     public boolean tryRespawn() { // CraftBukkit - return boolean
+         // Paper start - Perf: Do crystal-portal proximity check before entity lookup
+         return this.tryRespawn(null);

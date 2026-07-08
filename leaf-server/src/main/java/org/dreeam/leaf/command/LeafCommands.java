@@ -17,6 +17,7 @@ public final class LeafCommands {
     private static final Map<String, Command> COMMANDS = new HashMap<>();
 
     static {
+        COMMANDS.put(EnderDragonFightsCommand.COMMAND_LABEL, new EnderDragonFightsCommand());
         COMMANDS.put(LeafCommand.COMMAND_LABEL, new LeafCommand());
     }
 
